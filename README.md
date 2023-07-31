@@ -16,6 +16,8 @@ conda create -n mpl_niw -c conda-forge dask-jobqueue xarray zarr netcdf4 python-
 
 conda activate mpl_niw
 
+cd NIW 
+
 pip install rechunker
 
 conda install -c conda-forge xgcm xmitgcm
