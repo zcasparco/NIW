@@ -3,7 +3,6 @@
 All codes developed during postdoc at Scripps, around the in-situ data XXX
 
 Environment:
-XXX Add description of conda environment XXX
 
 conda create -n mpl_niw -c conda-forge dask-jobqueue xarray zarr netcdf4 python-graphviz \
             fastparquet pyarrow bottleneck \
