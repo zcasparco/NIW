@@ -5,6 +5,7 @@ import xarray as xr
 import pandas as pd
 from pandas import DataFrame, Series
 import geopandas as gpd
+from scipy import signal
 
 import dateutil
 from datetime import timedelta, datetime
@@ -16,7 +17,7 @@ g = 9.81
 omega_earth = 2.0 * np.pi / 86164.0905
 deg2rad = np.pi / 180.0
 deg2m = 111319
-
+s2cpd = 3600*24/(2*np.pi)
 
 def coriolis(lat, signed=False):
     if signed:
@@ -41,39 +42,6 @@ def fix_lon_bounds(lon):
         out[out > 180.0] = out[out > 180.0] - 360.0
         return out
 
-
-# ------------------------------ paths ---------------------------------------
-
-if os.path.isdir("/home/datawork-lops-osi/"):
-    # datarmor
-    platform = "datarmor"
-    datawork = os.getenv("DATAWORK") + "/"
-    home = os.getenv("HOME") + "/"
-    scratch = os.getenv("SCRATCH") + "/"
-    osi = "/home/datawork-lops-osi/"
-    #
-    root_data_dir = "/home/datawork-lops-osi/equinox/mit4320/"
-    ref_data_dir = "/dataref/ocean-analysis/intranet/LLC4320_surface/"
-    #
-    bin_data_dir = root_data_dir + "bin/"
-    bin_grid_dir = bin_data_dir + "grid/"
-    #
-    #zarr_data_dir = root_data_dir + "zarr/"
-    zarr_data_dir = ref_data_dir
-    zarr_grid = zarr_data_dir + "grid.zarr"
-    mask_path = zarr_data_dir + "mask.zarr"
-elif os.path.isdir("/work/ALT/swot/"):
-    # hal
-    platform = "hal"
-    tmp = os.getenv("TMPDIR")
-    home = os.getenv("HOME") + "/"
-    scratch = os.getenv("HOME") + "/scratch/"
-    #
-    root_data_dir = "/work/ALT/swot/swotpub/LLC4320/"
-    work_data_dir = "/work/ALT/swot/aval/syn/"
-    # grid_dir = root_data_dir+'grid/'
-    # grid_dir_nc = root_data_dir+'grid_nc/'
-    enatl60_data_dir = "/work/ALT/odatis/eNATL60/"
 
 # ------------------------------ mit specific ---------------------------------------
 
@@ -274,58 +242,70 @@ def dateRange(date1, date2, dt=timedelta(days=1.0)):
     for n in np.arange(date1, date2, dt):
         yield np64toDate(n)
 
-        
-# ------------------------------ misc data ---------------------------------------
-        
-def load_bathy(subsample=None):
-    """ Load bathymetry (etopo1)
-    
+
+def generate_filter(
+    band, T=10, dt=1 / 24, lat=None, bandwidth=None, normalized_bandwidth=None
+):
+    """Wrapper around scipy.signal.firwing
+
     Parameters
     ----------
-        subsample: int, optional
-            subsampling parameter:
-                30 leads to 1/2 deg resolution
-                15 leads to 1/4 deg resolution
+    band: str, float
+        Frequency band (e.g. "semidiurnal", ...) or filter central frequency
+    T: float
+        Filter length in days
+    dt: float
+        Filter/time series time step
+    lat: float
+        Latitude (for inertial band)
+    bandwidth: float
+        Filter bandwidth in cpd
+    dt: float
+        hours
     """
-    if platform=="datarmor":
-        path = os.path.join(osi, "equinox/misc/bathy/ETOPO1_Ice_g_gmt4.grd")
-    ds = xr.open_dataset(path)
-    if subsample is not None:
-        ds = ds.isel(x=slice(0, None, subsample),
-                     y=slice(0, None, subsample),
-                    )
-    ds['z'] = -ds['z']
-    ds = ds.rename({'x':'lon', 'y':'lat', 'z': 'h'})
-    return ds['h']
+    numtaps = int(T * 24)
+    pass_zero = False
+    #
+    if band == "subdiurnal":
+        pass_zero = True
+        cutoff = [1.0 / 2.0]
+    elif band == "semidiurnal":
+        omega = 1.9322  #  M2 24/12.4206012 = 1.9322
+    elif band == "diurnal":
+        omega = 1.0  # K1 24/23.93447213 = 1.0027
+    elif band == "inertial":
+        try:
+            omega = coriolis(lat) * 3600 / 2.0 / np.pi
+        except:
+            print("latitude needs to be provided to generate_filter")
+    elif isinstance(band, float):
+        omega = band
+    #
+    if bandwidth is not None:
+        cutoff = [omega - bandwidth, omega + bandwidth]
+    elif normalized_bandwidth is not None:
+        cutoff = [
+            omega * (1 - normalized_bandwidth),
+            omega * (1.0 + normalized_bandwidth),
+        ]
+    elif band != "subdiurnal":
+        print("bandwidth or normalized_bandwidth needs to be provided")
+    #
+    h = signal.firwin(
+        numtaps, cutoff=cutoff, pass_zero=pass_zero, fs=1 / dt, scale=True
+    )
+    return h
+def get_tidal_frequencies(*args, units="cpd"):
+    """ """
+    from pytide import WaveTable
 
-
-def load_oceans(features=["oceans"]):
-    """ Load Oceans, Seas and other features shapes
-    
-    Usage
-    -----
-    oceans = load_oceans()
-    oceans.loc[oceans.name == 'North Atlantic Ocean'].plot()
-    
-    Parameters
-    ----------
-        features: tuple, optional
-            Features to output: ("oceans", "seas", "other")
-    """
-    if platform=="datarmor":
-        path = os.path.join(osi, "equinox/misc/World_Seas_IHO_v3/World_Seas_IHO_v3.shp")
-    gdf = gpd.read_file(path)
-    gdf = gdf.rename(columns={c: c.lower() for c in gdf.columns})
-    out = {}
-    if "oceans" in features:
-        out["oceans"] = gdf.loc[gdf.name.str.contains('Ocean')]
-    if "seas" in features:
-        out["seas"] = gdf.loc[gdf.name.str.contains('Sea')]
-    if "other" in features:
-        out["other"] = gdf.loc[~gdf.name.str.contains('Ocean|Sea')]
-    if len(out)==1:
-        return list(out.values())[0]
+    td = WaveTable()
+    if units == "cpd":
+        scale = 86400 / 2 / np.pi
+    elif units == "cph":
+        scale = 3600 / 2 / np.pi
     else:
-        return out
-
-
+        # cps
+        scale = 1 / 2 / np.pi
+    return {c: td.wave(c).freq * scale for c in args}
+        
