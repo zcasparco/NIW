@@ -244,7 +244,7 @@ def dateRange(date1, date2, dt=timedelta(days=1.0)):
 
 
 def generate_filter(
-    band, T=10, dt=1 / 24, lat=None, bandwidth=None, normalized_bandwidth=None
+    band, dt=1/24, T=10, lat=None, bandwidth=None, normalized_bandwidth=None
 ):
     """Wrapper around scipy.signal.firwing
 
@@ -263,7 +263,7 @@ def generate_filter(
     dt: float
         hours
     """
-    numtaps = int(T * 24)
+    numtaps = int(T / dt)
     pass_zero = False
     #
     if band == "subdiurnal":
@@ -295,6 +295,12 @@ def generate_filter(
         numtaps, cutoff=cutoff, pass_zero=pass_zero, fs=1 / dt, scale=True
     )
     return h
+    
+def filter_response(h, dt=1/24):
+    """Returns the frequency response"""
+    w, hh = signal.freqz(h, worN=8000, fs=1/dt)
+    return hh, w
+    
 def get_tidal_frequencies(*args, units="cpd"):
     """ """
     from pytide import WaveTable

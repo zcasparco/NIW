@@ -1,0 +1,76 @@
+# niskine config file
+path:
+  # Path to output data - refer to as $data in entries below. This data
+  # directory lives in the root directory given below (most likely where this
+  # config file lives as well).
+  data: data/
+  fig: fig/
+
+# Input and output data
+data:
+  input:
+    osnap: # Directory with OSNAP mooring data
+      $data/input/osnap/US_eastern_2014_2016/data/files/
+    argo_mld: # Argo mixed layer climatology
+      $data/input/argo_mld_climatology/Argo_mixedlayers_monthlyclim_04142022.nc
+    chipod: # Directory with chipod summaries. Currently linked here from elsewhere.
+      $data/input/chipod/
+
+  proc:
+    adcp: # Directory with processed adcp data
+      $data/proc/adcp/
+    mb: # Processed multibeam bathymetric data
+      $data/proc/mb/merged_100_-28_-21_56_61.nc
+    sbe37: # Directory with processed microcat data
+      $data/input/sbe37/
+    thermistor: # Directory with processed thermistor data
+      $data/proc/thermistor/
+    thermistor2min: # 2 minute interpolated thermistor data
+      $data/proc/thermistor_2min/
+
+  gridded:
+    adcp: $data/gridded/adcp/
+    osnap: $data/gridded/osnap/
+    # gridded thermistor data
+    temperature: $data/gridded/temperature/t_10m_2min.nc
+    # gridded thermistor data from Anna
+    temperature_10m_mat: $data/input/temperature/InterpolatedM1_10mBins.mat
+    temperature_mat: $data/input/temperature/M1Temperature.mat
+    temperature_10m_nc: $data/gridded/temperature/t_10m.nc
+
+  ssh: $data/ssh/
+  ssh_m1: $data/ssh/m1_ssh.nc
+  sst: $data/sst/
+  wind:
+    dir: $data/wind/
+    era5: $data/wind/era5_uv_10m.nc 
+    era5_m1: $data/wind/m1_era5_uv_10m.nc 
+
+  wind_work:
+    niskine_m1: $data/wind_work/ni_wind_work_niskine_m1.nc
+    niskine_m1_cumulative: $data/wind_work/ni_wind_work_niskine_m1_integrated.nc
+    niskine_m1_wind_stress: $data/wind_work/wind_stress_niskine_m1.nc
+    osnap_umm3: $data/wind_work/ni_wind_work_osnap_umm3.nc
+    osnap_umm3_cumulative: $data/wind_work/ni_wind_work_osnap_umm3_integrated.nc
+    osnap_umm4: $data/wind_work/ni_wind_work_osnap_umm4.nc
+    osnap_umm4_cumulative: $data/wind_work/ni_wind_work_osnap_umm4_integrated.nc
+
+  ni_eke_m1: $data/ni_eke_m1.nc
+  ni_eke_m2: $data/ni_eke_m2.nc
+
+  # mixed layer properties
+  ml:
+    # mixed layer depth
+    mld: $data/ml/mld.nc
+    mld_with_extras: $data/ml/mld_with_extras.nc
+    # velocity averaged over MLD
+    ml_vel: $data/ml/mlvel.nc
+    # mixed layer depth from Anna
+    mld_mat: $data/ml/MLD.mat
+    mld_old: $data/ml/mld_old.nc
+    # mixed layer depth extracted from the Argo MLD climatology
+    mld_argo: $data/ml/mld_argo.nc
+
+mooring_locations: $data/niskine_mooring_locations.nc
+
+m1_sensor_config: $data/m1_sensor_distribution.csv
