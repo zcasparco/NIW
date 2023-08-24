@@ -16,7 +16,8 @@ def plot_uv(ds,V,fig,ax,cmap = 'coolwarm', vmax=0.4,**kwargs):
 def plot_event2D(ds,v,mld,ti,tf,months,**kwargs):
     fig,axs = plt.subplots(1,len(ti),figsize=(5*len(ti),6))
     for i in range(len(ti)):
-        ds.sel(time=slice(ti[i],tf[i]))[v].plot(ax=axs[i],y='z',yincrease=False,**kwargs)
-        axs[i].axhline(mld.sel(month=months[i]),c='c',lw=2)
+        ds.sel(time=slice(ti[i],tf[i]))[v].plot(ax=axs[i],zorder=-1,y='z',yincrease=False,**kwargs)
+        mld.sel(time=slice(ti[i],tf[i])).plot(ax=axs[i],x='time',c='c',zorder=1)
+        #axs[i].plot(mld.sel(time=slice(ti[i],tf[i])),c='c',lw=2,zorder=1)
         axs[i].set_title('Month %s'%months[i])
     return fig,axs
