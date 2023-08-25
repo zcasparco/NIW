@@ -26,6 +26,7 @@ import pandas as pd
 import xarray as xr
 from pathlib import Path
 import gsw
+import scipy.signal as signal
 
 #import gvpy as gv
 import niskine
@@ -55,3 +56,54 @@ def calc_ni_eke(adcp):
     # calculate NI EKE
     adcp["ni_eke"] = 0.5 * rho * ((wkb * adcp.bpu) ** 2 + (wkb * adcp.bpv) ** 2)
     return adcp,wkb
+
+def _get_E(x, ufunc=True, **kwargs):
+    ax = -1 if ufunc else 0
+    #
+    dkwargs = {
+        "window": "hann",
+        "return_onesided": False,
+        "detrend": None,
+        "scaling": "density",
+    }
+    dkwargs.update(kwargs)
+    f, E = signal.welch(x, fs=6*24.0, axis=ax, **dkwargs)
+    #
+    if ufunc:
+        return E
+    else:
+        return f, E
+
+
+def get_E(v, f=None, **kwargs):
+    #v = v.chunk({"time": len(v.time)})
+    if "nperseg" in kwargs:
+        Nb = kwargs["nperseg"]
+    else:
+        Nb = 60 * 24
+        kwargs["nperseg"] = Nb
+    if "return_onesided" in kwargs and kwargs["return_onesided"]:
+        Nb = int(Nb/2)+1
+    if f is None:
+        f, E = _get_E(v.values, ufunc=False, **kwargs)
+        return f, E
+    else:
+        E = xr.apply_ufunc(
+            _get_E,
+            v,
+            dask="parallelized",
+            output_dtypes=[np.float64],
+            input_core_dims=[["time"]],
+            output_core_dims=[["freq_time"]],
+            dask_gufunc_kwargs={"output_sizes": {"freq_time": Nb}},
+            kwargs=kwargs,
+        )
+        E = E.assign_coords(freq_time=f).sortby("freq_time")
+        E.attrs.update({'long_name':'PSD','units':r'$m^2.s^{-1}$'})
+        E.freq_time.attrs.update({'long_name':'Frequency','units':'cpd'})
+        return E
+
+def wrap_spectra(ds, v, Nb=30*24*6):
+    f, E = get_E(ds[v].isel(z=1), nperseg=Nb)
+    E = get_E(ds[v], f=f, nperseg=Nb,detrend=False).compute()
+    return f,E
