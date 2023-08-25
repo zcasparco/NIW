@@ -103,7 +103,7 @@ def get_E(v, f=None, **kwargs):
         E.freq_time.attrs.update({'long_name':'Frequency','units':'cpd'})
         return E
 
-def wrap_spectra(ds, v, Nb=30*24*6):
-    f, E = get_E(ds[v].isel(z=1), nperseg=Nb)
-    E = get_E(ds[v], f=f, nperseg=Nb,detrend=False).compute()
+def wrap_spectra(ds, v, Nb=30*24*6,**kwargs):
+    f, E = get_E(ds[v].isel(z=1), nperseg=Nb,**kwargs)
+    E = get_E(ds[v], f=f, nperseg=Nb,detrend=False,**kwargs).compute()
     return f,E
