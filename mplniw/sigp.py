@@ -27,9 +27,10 @@ import xarray as xr
 from pathlib import Path
 import gsw
 import scipy.signal as signal
-
 #import gvpy as gv
 import niskine
+
+min2d=1/(60*24)
 
 def ni_bandpass_adcp(adcp, bandwidth=1.06):
     tlow, thigh = niskine.calcs.determine_ni_band(bandwidth=1.06)
@@ -107,3 +108,69 @@ def wrap_spectra(ds, v, Nb=30*24*6,**kwargs):
     f, E = get_E(ds[v].isel(z=1), nperseg=Nb,**kwargs)
     E = get_E(ds[v], f=f, nperseg=Nb,detrend=False,**kwargs).compute()
     return f,E
+
+def convolve(x, h=None, hilbert=False):
+    """ Convolve an input signal with a kernel
+    Optionaly compute the Hilbert transform of the resulting time series
+    
+    Parameters
+    x : input signal
+    h : filter 
+    hilbert : True for Hilbert transform to be applied to the filtered signal
+    
+    Returns
+    x_f : filtered signal or hilbert transform of the filtered signal
+    """
+    #x_c = np.nan_to_num(x,0)
+    #argnan = np.where(np.isnan(x))
+    x_c = x.copy()
+    x_fill = np.nan_to_num(x_c)
+    argnan = np.where(np.isnan(x_c)==True)
+    x_f = signal.filtfilt(h, [1], x_fill, axis=-1,padlen=0)#
+    x_f[argnan]=np.nan
+    if hilbert:
+        return signal.hilbert(x_f)
+    else:
+        return x_f
+
+def filt(v, h, hilbert=False):
+    
+    output_dtype = complex if hilbert else float
+    gufunc_kwargs = dict(output_sizes={'time': len(v.time)})
+    return xr.apply_ufunc(convolve, v, kwargs={'h': h, 'hilbert': hilbert},
+                    dask='parallelized', output_dtypes=[output_dtype],
+                    input_core_dims=[['time']],
+                    output_core_dims=[['time']],
+                    dask_gufunc_kwargs = gufunc_kwargs,
+                         )
+def wrap_filter(ds,h):
+    ds_copy = ds.copy()
+    for v in ['u','v']:
+        ds_copy[v+'_filtered'] = filt(ds[v],h)
+    return ds_copy
+
+def interpolation(dict_array, z_new, t_new, minDT=60, dt=10, fill_gaps=True, **kwargs):
+    """
+    dict_xarray: Contains the adcp nuber as key and corresponding DataArray in item, dict
+    z_new: regular depth grid to use for interpolation, numpy array
+    t_new: regular time grid to use for interpolation, pandas date range
+    fill_gaps: optional (default is True), Gaps in depth are filled using interpolation
+    """
+    _array = dict_array.copy()
+    for a in dict_array:
+        if dict_array[a].time.size<minDT/(dt*min2d):
+            del _array[a]
+    list_interp = [_array[a].sel(time=slice(t_new[0],t_new[-1])).interp(time=t_new,z=z_new) for a in _array]
+    if len(list_interp)==1:
+        ds = list_interp[0]
+    elif len(list_interp)>1:
+        ds = list_interp[0].copy()
+        for l in list_interp[1:]:
+            ds = ds.combine_first(l)
+    else :
+        raise Error
+        
+    if fill_gaps:
+        return ds,ds.interpolate_na(dim='z',**kwargs)
+    else:
+        return ds

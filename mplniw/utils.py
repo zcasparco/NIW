@@ -18,7 +18,6 @@ omega_earth = 2.0 * np.pi / 86164.0905
 deg2rad = np.pi / 180.0
 deg2m = 111319
 s2cpd = 3600*24/(2*np.pi)
-
 def coriolis(lat, signed=False):
     if signed:
         return 2.0 * omega_earth * np.sin(lat * deg2rad)
@@ -244,7 +243,7 @@ def dateRange(date1, date2, dt=timedelta(days=1.0)):
 
 
 def generate_filter(
-    band, dt=1/24, T=10, lat=None, bandwidth=None, normalized_bandwidth=None
+    band, dt=1/24, T=10, lat=None, bandwidth=None, normalized_bandwidth=None, pass_zero=False
 ):
     """Wrapper around scipy.signal.firwing
 
@@ -264,10 +263,10 @@ def generate_filter(
         hours
     """
     numtaps = int(T / dt)
-    pass_zero = False
+    #pass_zero = False
     #
     if band == "subdiurnal":
-        pass_zero = True
+        #pass_zero = True
         cutoff = [1.0 / 2.0]
     elif band == "semidiurnal":
         omega = 1.9322  #  M2 24/12.4206012 = 1.9322
@@ -280,6 +279,7 @@ def generate_filter(
             print("latitude needs to be provided to generate_filter")
     elif isinstance(band, float):
         omega = band
+        cutoff= [1.0 / band]
     #
     if bandwidth is not None:
         cutoff = [omega - bandwidth, omega + bandwidth]
@@ -288,8 +288,8 @@ def generate_filter(
             omega * (1 - normalized_bandwidth),
             omega * (1.0 + normalized_bandwidth),
         ]
-    elif band != "subdiurnal":
-        print("bandwidth or normalized_bandwidth needs to be provided")
+    #elif band != "subdiurnal":
+    #    print("bandwidth or normalized_bandwidth needs to be provided")
     #
     h = signal.firwin(
         numtaps, cutoff=cutoff, pass_zero=pass_zero, fs=1 / dt, scale=True
