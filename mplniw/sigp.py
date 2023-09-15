@@ -143,10 +143,24 @@ def filt(v, h, hilbert=False):
                     output_core_dims=[['time']],
                     dask_gufunc_kwargs = gufunc_kwargs,
                          )
-def wrap_filter(ds,h):
+#def hilbert_transform(v):
+#    return signal.
+def wrap_hilbert(ds,v):
+    output_dtype = complex
+    gufunc_kwargs = dict(output_sizes={'time': len(v.time)})
     ds_copy = ds.copy()
     for v in ['u','v']:
-        ds_copy[v+'_filtered'] = filt(ds[v],h)
+        ds_copy[v+'_filtered'] = xr.apply_ufunc(signalhilbert, ds[v].fillna(0), output_dtypes=[output_dtype],
+                    input_core_dims=[['time']],
+                    output_core_dims=[['time']],
+                    dask_gufunc_kwargs = gufunc_kwargs,
+                         )
+    return ds_copy
+    
+def wrap_filter(ds,h,**kwargs):
+    ds_copy = ds.copy()
+    for v in ['u','v']:
+        ds_copy[v+'_filtered'] = filt(ds[v],h,**kwargs)
     return ds_copy
 
 def interpolation(dict_array, z_new, t_new, minDT=60, dt=10, fill_gaps=True, **kwargs):
