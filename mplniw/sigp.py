@@ -157,9 +157,9 @@ def wrap_hilbert(ds,v):
                          )
     return ds_copy
     
-def wrap_filter(ds,h,**kwargs):
+def wrap_filter(ds,h,columns=['u','v'],**kwargs):
     ds_copy = ds.copy()
-    for v in ['u','v']:
+    for v in columns:
         ds_copy[v+'_filtered'] = filt(ds[v],h,**kwargs)
     return ds_copy
 
